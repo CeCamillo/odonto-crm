@@ -1,0 +1,35 @@
+{
+  "name": "odonto-crm-backend",
+  "version": "1.0.0",
+  "description": "Backend API for OdontoCRM dental practice management",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "keywords": ["dental", "crm", "elysia", "api"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.0",
+    "@elysiajs/swagger": "^1.3.1",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.0",
+    "elysia": "^1.4.18",
+    "postgres": "^3.4.7",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.2",
+    "drizzle-kit": "^0.31.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
