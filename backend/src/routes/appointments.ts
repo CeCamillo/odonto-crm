@@ -1,12 +1,46 @@
 import { Elysia, t } from "elysia";
 import { appointmentService } from "../services/appointment.service";
 import { patientService } from "../services/patient.service";
+import { googleCalendarService } from "../services/google-calendar.service";
 import {
   createAppointmentSchema,
   updateAppointmentSchema,
   type CreateAppointmentInput,
   type UpdateAppointmentInput,
 } from "../schemas/appointment";
+
+// Default user ID for single-user mode
+const DEFAULT_USER_ID = "default";
+
+// Helper to sync appointment to Google Calendar
+async function syncToGoogleCalendar(
+  appointment: { id: string; title: string; description?: string | null; startTime: Date; endTime: Date },
+  patient: { name: string; email: string }
+): Promise<string | null> {
+  if (!googleCalendarService.hasValidTokens(DEFAULT_USER_ID)) {
+    return null;
+  }
+
+  try {
+    const eventId = await googleCalendarService.createEvent(DEFAULT_USER_ID, {
+      summary: `${appointment.title} - ${patient.name}`,
+      description: appointment.description || undefined,
+      start: {
+        dateTime: appointment.startTime.toISOString(),
+        timeZone: "UTC",
+      },
+      end: {
+        dateTime: appointment.endTime.toISOString(),
+        timeZone: "UTC",
+      },
+      attendees: [{ email: patient.email, displayName: patient.name }],
+    });
+    return eventId;
+  } catch (error) {
+    console.error("Failed to sync to Google Calendar:", error);
+    return null;
+  }
+}
 
 export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
   // Get all appointments with filtering
@@ -134,7 +168,8 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
         };
       }
 
-      const appointment = await appointmentService.create({
+      // Create appointment
+      let appointment = await appointmentService.create({
         patientId: data.patientId,
         title: data.title,
         description: data.description,
@@ -143,11 +178,25 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
         status: data.status || "scheduled",
       });
 
+      // Sync to Google Calendar if connected
+      const googleEventId = await syncToGoogleCalendar(
+        { ...appointment, startTime, endTime },
+        patient
+      );
+
+      // Update appointment with Google Event ID if synced
+      if (googleEventId) {
+        appointment = (await appointmentService.update(appointment.id, {
+          googleEventId,
+        }))!;
+      }
+
       set.status = 201;
       return {
         success: true,
         data: appointment,
         message: "Appointment created successfully",
+        googleSynced: !!googleEventId,
       };
     },
     {
@@ -162,7 +211,7 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
       detail: {
         tags: ["Appointments"],
         summary: "Create a new appointment",
-        description: "Create a new appointment with conflict detection",
+        description: "Create a new appointment with conflict detection and optional Google Calendar sync",
       },
     }
   )
@@ -245,6 +294,7 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
         }
       }
 
+      // Update appointment
       const appointment = await appointmentService.update(params.id, {
         patientId: data.patientId,
         title: data.title,
@@ -254,10 +304,40 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
         status: data.status,
       });
 
+      // Sync update to Google Calendar if connected and has event ID
+      let googleSynced = false;
+      if (
+        existingAppointment.googleEventId &&
+        googleCalendarService.hasValidTokens(DEFAULT_USER_ID)
+      ) {
+        try {
+          await googleCalendarService.updateEvent(
+            DEFAULT_USER_ID,
+            existingAppointment.googleEventId,
+            {
+              summary: data.title
+                ? `${data.title} - ${existingAppointment.patient.name}`
+                : undefined,
+              description: data.description,
+              start: startTime
+                ? { dateTime: startTime.toISOString(), timeZone: "UTC" }
+                : undefined,
+              end: endTime
+                ? { dateTime: endTime.toISOString(), timeZone: "UTC" }
+                : undefined,
+            }
+          );
+          googleSynced = true;
+        } catch (error) {
+          console.error("Failed to sync update to Google Calendar:", error);
+        }
+      }
+
       return {
         success: true,
         data: appointment,
         message: "Appointment updated successfully",
+        googleSynced,
       };
     },
     {
@@ -275,7 +355,7 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
       detail: {
         tags: ["Appointments"],
         summary: "Update an appointment",
-        description: "Update an existing appointment with conflict detection",
+        description: "Update an existing appointment with conflict detection and Google Calendar sync",
       },
     }
   )
@@ -293,11 +373,26 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
         };
       }
 
+      // Delete from Google Calendar if synced
+      let googleSynced = false;
+      if (
+        appointment.googleEventId &&
+        googleCalendarService.hasValidTokens(DEFAULT_USER_ID)
+      ) {
+        try {
+          await googleCalendarService.deleteEvent(DEFAULT_USER_ID, appointment.googleEventId);
+          googleSynced = true;
+        } catch (error) {
+          console.error("Failed to delete from Google Calendar:", error);
+        }
+      }
+
       await appointmentService.delete(params.id);
 
       return {
         success: true,
         message: "Appointment deleted successfully",
+        googleSynced,
       };
     },
     {
@@ -307,7 +402,7 @@ export const appointmentRoutes = new Elysia({ prefix: "/api/appointments" })
       detail: {
         tags: ["Appointments"],
         summary: "Delete an appointment",
-        description: "Delete an appointment record",
+        description: "Delete an appointment record and remove from Google Calendar if synced",
       },
     }
   );

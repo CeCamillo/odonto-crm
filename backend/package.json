@@ -14,7 +14,12 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts"
   },
-  "keywords": ["dental", "crm", "elysia", "api"],
+  "keywords": [
+    "dental",
+    "crm",
+    "elysia",
+    "api"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -23,6 +28,7 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.0",
     "elysia": "^1.4.18",
+    "googleapis": "^168.0.0",
     "postgres": "^3.4.7",
     "zod": "^4.1.13"
   },
