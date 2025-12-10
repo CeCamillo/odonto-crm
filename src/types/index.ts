@@ -4,11 +4,29 @@ export interface Patient {
   name: string;
   email: string;
   phone: string;
-  dateOfBirth: Date;
-  address: string;
+  dateOfBirth: string; // ISO date string from API
+  address?: string | null;
+  medicalHistory?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePatientInput {
+  name: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  address?: string;
   medicalHistory?: string;
-  createdAt: Date;
-  updatedAt: Date;
+}
+
+export interface UpdatePatientInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  address?: string;
+  medicalHistory?: string;
 }
 
 // Appointment types
@@ -18,26 +36,71 @@ export interface Appointment {
   id: string;
   patientId: string;
   title: string;
-  description?: string;
-  startTime: Date;
-  endTime: Date;
+  description?: string | null;
+  startTime: string; // ISO datetime string from API
+  endTime: string;
   status: AppointmentStatus;
-  googleEventId?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  googleEventId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppointmentWithPatient extends Appointment {
+  patient: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+  };
+}
+
+export interface CreateAppointmentInput {
+  patientId: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  status?: AppointmentStatus;
+}
+
+export interface UpdateAppointmentInput {
+  patientId?: string;
+  title?: string;
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  status?: AppointmentStatus;
 }
 
 // API Response types
 export interface ApiResponse<T> {
-  data: T;
-  message?: string;
   success: boolean;
+  data?: T;
+  message?: string;
+  errors?: Array<{ path: string[]; message: string }>;
 }
 
 export interface PaginatedResponse<T> {
+  success: boolean;
   data: T[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+// Query parameter types
+export interface PatientQueryParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+export interface AppointmentQueryParams {
+  page?: number;
+  pageSize?: number;
+  patientId?: string;
+  status?: AppointmentStatus;
+  startDate?: string;
+  endDate?: string;
 }
